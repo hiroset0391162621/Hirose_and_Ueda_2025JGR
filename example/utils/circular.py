@@ -1,6 +1,5 @@
 import cmath
 import numpy as np
-import scipy.stats as stats
 import copy
 
 def mean(angles, deg=True):
@@ -36,25 +35,3 @@ def std(angles, deg=True):
     
 
 
-def corrcoef(x, y, deg=True, test=False):
-    """Circular correlation coefficient of two angle data(default to degree)
-    Set `test=True` to perform a significance test.
-    """
-    convert = np.pi / 180.0 if deg else 1
-    sx = np.frompyfunc(np.sin, 1, 1)((x - mean(x, deg)) * convert)
-    sy = np.frompyfunc(np.sin, 1, 1)((y - mean(y, deg)) * convert)
-    r = (sx * sy).sum() / np.sqrt((sx**2).sum() * (sy**2).sum())
-
-    if test:
-        l20, l02, l22 = (
-            (sx**2).sum(),
-            (sy**2).sum(),
-            ((sx**2) * (sy**2)).sum(),
-        )
-        test_stat = r * np.sqrt(l20 * l02 / l22)
-        p_value = 2 * (1 - stats.norm.cdf(abs(test_stat)))
-        return tuple(round(v, 7) for v in (r, test_stat, p_value))
-    return round(r, 7)
-
-if __name__ == "__main__":
-    test()

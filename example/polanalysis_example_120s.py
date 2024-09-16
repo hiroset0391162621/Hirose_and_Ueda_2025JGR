@@ -1,10 +1,11 @@
 # import copy
 # import cmath
+import sys
 import datetime
 # import pandas as pd
 import numpy as np
 # import scipy.signal as ssig
-from scipy import *
+#from scipy import *
 # from obspy import read
 import obspy
 from obspy.core import UTCDateTime
@@ -15,8 +16,8 @@ import warnings
 warnings.simplefilter('ignore')
 # from obspy.signal.trigger import classic_sta_lta
 # from obspy.signal.tf_misfit import cwt
+sys.path.append(sys.path.append("core/"))
 import backazimuth
-import sys
 sys.path.append(sys.path.append("utils/"))
 import circular
 sys.path.append(sys.path.append("nipfilter/"))
@@ -24,8 +25,10 @@ sys.path.append(sys.path.append("nipfilter/"))
 # import filter as filt_par
 sys.path.append(sys.path.append("s-transform/"))
 
-
-import scienceplots
+try:
+    import scienceplots
+except:
+    pass
 plt.style.use(['science', 'nature'])
 plt.rcParams['xtick.labelsize'] = 12
 plt.rcParams['ytick.labelsize'] = 12
