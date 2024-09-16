@@ -1,26 +1,27 @@
-import copy
-import cmath
+# import copy
+# import cmath
 import datetime
-import pandas as pd
+# import pandas as pd
 import numpy as np
-import scipy.signal as ssig
+# import scipy.signal as ssig
 from scipy import *
-from obspy import read
+# from obspy import read
 import obspy
 from obspy.core import UTCDateTime
-from obspy.signal.regression import linear_regression
+# from obspy.signal.regression import linear_regression
 import matplotlib.pyplot as plt
 from matplotlib.ticker import *
 import warnings
 warnings.simplefilter('ignore')
-from obspy.signal.trigger import classic_sta_lta
-from obspy.signal.tf_misfit import cwt
+# from obspy.signal.trigger import classic_sta_lta
+# from obspy.signal.tf_misfit import cwt
 import backazimuth
 import sys
+sys.path.append(sys.path.append("utils/"))
 import circular
 sys.path.append(sys.path.append("nipfilter/"))
-from core import stransform, istransform
-import filter as filt_par
+# from core import stransform, istransform
+# import filter as filt_par
 sys.path.append(sys.path.append("s-transform/"))
 
 
@@ -50,20 +51,6 @@ plt.rcParams['text.color'] = '#08192D'
 plt.rcParams['legend.framealpha'] = 1.0 
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['text.usetex']   = False
-
-
-
-
-def cosTaper(windL, percent):
-    N = windL
-    tp = np.ones(N)
-    for i in range(int(N*percent+1)):
-        tp[i] *= 0.5 * (1 - np.cos((np.pi * i) / ( N * percent)))
-
-    for i in range(int(N*(1-percent)), N):
-        tp[i] *= 0.5 * (1 - np.cos((np.pi * (i+1)) / ( N * percent)))
-
-    return tp
 
 
 
@@ -180,15 +167,6 @@ def ci_eachf(Fv, baz, Tv):
             mean_direction_ci[i,1] = mean_direction_low
             mean_direction_ci[i,2] = mean_direction_high
         
-        
-
-        # hist_night, bins_night = np.histogram(baz2, bins=40, range=(-180,180))
-        # bins_night = [ 0.5*(bins_night[_-1]+bins_night[_]) for _ in range(1, len(bins_night)) ]
-                    
-        # plt.bar(bins_night, hist_night)
-        # plt.axvline(x=mean_direction_low, color='red')
-        # plt.axvline(x=mean_direction_high, color='red')
-        # plt.show()
 
     return mean_direction_ci
 
