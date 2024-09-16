@@ -1,0 +1,461 @@
+import copy
+import cmath
+import datetime
+import pandas as pd
+import numpy as np
+import scipy.signal as ssig
+from scipy import *
+from obspy import read
+import obspy
+from obspy.core import UTCDateTime
+from obspy.signal.regression import linear_regression
+import matplotlib.pyplot as plt
+from matplotlib.ticker import *
+import warnings
+warnings.simplefilter('ignore')
+from obspy.signal.trigger import classic_sta_lta
+from obspy.signal.tf_misfit import cwt
+import backazimuth
+import sys
+import circular
+sys.path.append(sys.path.append("nipfilter/"))
+from core import stransform, istransform
+import filter as filt_par
+sys.path.append(sys.path.append("s-transform/"))
+
+
+import scienceplots
+plt.style.use(['science', 'nature'])
+plt.rcParams['xtick.labelsize'] = 12
+plt.rcParams['ytick.labelsize'] = 12
+plt.rcParams['axes.linewidth'] = 1.5 
+plt.rcParams['xtick.major.width'] = 1.5
+plt.rcParams['ytick.major.width'] = 1.5
+plt.rcParams['xtick.minor.width'] = 1.5
+plt.rcParams['ytick.minor.width'] = 1.5
+plt.rcParams['xtick.direction'] = "inout"
+plt.rcParams['ytick.direction'] = "inout"
+plt.rcParams['xtick.major.size'] = 6.0
+plt.rcParams['xtick.minor.size'] = 4.0
+plt.rcParams['ytick.major.size'] = 6.0
+plt.rcParams['ytick.minor.size'] = 4.0
+plt.rcParams['xtick.major.pad']='8'
+plt.rcParams['xtick.top'] = True
+plt.rcParams['ytick.right'] = True
+plt.rcParams['axes.edgecolor'] = '#08192D' 
+plt.rcParams['axes.labelcolor'] = '#08192D' 
+plt.rcParams['xtick.color'] = '#08192D' 
+plt.rcParams['ytick.color'] = '#08192D'
+plt.rcParams['text.color'] = '#08192D' 
+plt.rcParams['legend.framealpha'] = 1.0 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['text.usetex']   = False
+
+
+
+
+def cosTaper(windL, percent):
+    N = windL
+    tp = np.ones(N)
+    for i in range(int(N*percent+1)):
+        tp[i] *= 0.5 * (1 - np.cos((np.pi * i) / ( N * percent)))
+
+    for i in range(int(N*(1-percent)), N):
+        tp[i] *= 0.5 * (1 - np.cos((np.pi * (i+1)) / ( N * percent)))
+
+    return tp
+
+
+
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import matplotlib.colors as colors
+import warnings
+warnings.filterwarnings('ignore')
+
+
+gscolors = np.array(
+    [
+        [243, 243, 241, 1],
+        [0, 242, 242, 1],
+        [0, 121, 242, 1],
+        [0, 0, 242, 1],
+        [121, 0, 242, 1],
+        [242, 0, 242, 1],
+        [242, 0, 121, 1],
+        [242, 0, 0, 1],
+        [242, 121, 0, 1],
+        [242, 242, 0, 1],
+        [121, 242, 0, 1],
+        [0, 242, 0, 1],
+        [0, 242, 121, 1],
+        [0, 242, 242, 1],
+        [243, 243, 241, 1],
+    ],
+    dtype=np.float64,
+)
+gscolors[:, :3] /= 256  
+gscmap = ListedColormap(gscolors)
+hsv2 = LinearSegmentedColormap.from_list("gscmap2", colors=gscolors)
+
+
+from scipy.stats import circmean, vonmises
+from scipy.special import i0
+
+def bootstrap_vm_confidence_interval(data, alpha=0.05, reps=1000):
+    """
+    Calculate the bootstrap confidence interval for the von Mises mean direction and concentration parameter.
+
+    :param data: array-like, circular data (in radians)
+    :param alpha: float, confidence level (default 0.05 for 95% confidence interval)
+    :param reps: int, number of bootstrap samples (default 1000)
+    :return: tuple, (mean_direction_low, mean_direction_high, kappa_low, kappa_high)
+    """
+    n = len(data)
+    bootstrap_means = []
+    bootstrap_kappas = []
+
+    def estimate_kappa(R, n):
+        """Estimate the concentration parameter kappa using the average resultant length R."""
+        if R < 0.53:
+            kappa = 2 * R + R**3 + (5 * R**5) / 6
+        elif R < 0.85:
+            kappa = -0.4 + 1.39 * R + 0.43 / (1 - R)
+        else:
+            kappa = 1 / (2 * (1 - R))
+        return kappa
+
+    for _ in range(reps):
+        # Resample with replacement
+        sample = np.random.choice(data, size=n, replace=True)
+        
+        # Compute the mean direction (in radians)
+        mean_direction = circmean(sample, high=np.pi, low=-np.pi)
+        bootstrap_means.append(mean_direction)
+        
+        # Compute resultant length R
+        C = np.sum(np.cos(sample)) / n
+        S = np.sum(np.sin(sample)) / n
+        R = np.sqrt(C**2 + S**2)
+        
+        # Estimate kappa (concentration parameter)
+        kappa = estimate_kappa(R, n)
+        bootstrap_kappas.append(kappa)
+
+    # Convert results to numpy arrays for easier manipulation
+    bootstrap_means = np.array(bootstrap_means)
+    bootstrap_kappas = np.array(bootstrap_kappas)
+    
+    # Compute percentiles for confidence intervals
+    mean_direction_low = np.percentile(bootstrap_means, (alpha / 2) * 100)
+    mean_direction_high = np.percentile(bootstrap_means, (1 - alpha / 2) * 100)
+    
+    kappa_low = np.percentile(bootstrap_kappas, (alpha / 2) * 100)
+    kappa_high = np.percentile(bootstrap_kappas, (1 - alpha / 2) * 100)
+
+    return mean_direction_low, mean_direction_high, kappa_low, kappa_high
+
+
+def ci_eachf(Fv, baz, Tv):
+    time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=120) )[0]
+    mean_direction_ci = np.zeros((Fv.shape[0], 3))*np.nan
+    for i in range(Fv.shape[0]): 
+        baz2 = (baz[:,time_baz_idx][i,:]).flatten()
+        baz2 = baz2[baz2==baz2]
+        
+        
+        
+        if Fv[i,0]>=0.0:
+            mean_direction_low, mean_direction_high, kappa_low, kappa_high = bootstrap_vm_confidence_interval(np.deg2rad(baz2))   
+            mean_direction_low = np.rad2deg(mean_direction_low)
+            mean_direction_high = np.rad2deg(mean_direction_high)
+            print(str(Fv[i,0])+"Hz", mean_direction_low, mean_direction_high)
+            
+            if mean_direction_low<-180:
+                mean_direction_low = np.nan
+            
+            if mean_direction_high>180:
+                mean_direction_high = np.nan
+                
+            mean_direction_ci[i,0] = Fv[i,0]
+            mean_direction_ci[i,1] = mean_direction_low
+            mean_direction_ci[i,2] = mean_direction_high
+        
+        
+
+        # hist_night, bins_night = np.histogram(baz2, bins=40, range=(-180,180))
+        # bins_night = [ 0.5*(bins_night[_-1]+bins_night[_]) for _ in range(1, len(bins_night)) ]
+                    
+        # plt.bar(bins_night, hist_night)
+        # plt.axvline(x=mean_direction_low, color='red')
+        # plt.axvline(x=mean_direction_high, color='red')
+        # plt.show()
+
+    return mean_direction_ci
+
+
+
+
+if __name__ == '__main__':
+
+    Fs = 20.0
+    azimuth = 40.0
+    windL = 120.0
+    station = 'V.KIRA'
+    starttime = datetime.datetime(2017,1,1,1,10,0)
+    #starttime = datetime.datetime(2017,10,15,1,10,0)
+
+    stream_Z = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.U.sac').resample(Fs, window='hann')
+    stream_N = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.N.sac').resample(Fs, window='hann')
+    stream_E = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.E.sac').resample(Fs, window='hann')
+
+
+    stream_Z[0].data *= 1e-9
+    stream_N[0].data *= 1e-9
+    stream_E[0].data *= 1e-9
+
+
+    stream_Z.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+    stream_N.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+    stream_E.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+
+    tr_Z = stream_Z[0].data
+    tr_N = stream_N[0].data
+    tr_E = stream_E[0].data
+
+
+    baz, nip, Tv, Fv, Sv, Se, Sn = backazimuth.calc_baz(tr_Z.copy(), tr_E.copy(), tr_N.copy(), Fs, azimuth, 'retrograde')
+
+
+
+
+    fig = plt.figure(figsize=(5,8)) 
+
+
+    ax1 = plt.axes([0.1,0.78,0.68,0.15])
+    trace_amp = 1.5*np.max(np.abs(tr_Z))
+    ax1.plot(np.linspace(0,windL, len(tr_Z)), tr_Z, lw=1, color='k')
+    ax1.annotate(station+'.U (raw)', xy=(0.05, 0.95), xycoords='axes fraction', fontsize=12,
+                horizontalalignment='left', verticalalignment='top')
+    ax1.set_xlim(0,windL)
+    ax1.set_ylim(-trace_amp, trace_amp)
+    ax1.set_ylabel('velocity [m/s]', fontsize=12)
+
+    ax11 = plt.axes([0.9,0.5,0.1,0.2])
+    plt.xticks(())
+    plt.yticks(())
+    ax11.spines['right'].set_color('none')
+    ax11.spines['left'].set_color('none')
+    ax11.spines['top'].set_color('none')
+    ax11.spines['bottom'].set_color('none')   
+    ax11.patch.set_alpha(0.)
+
+
+
+    ax5 = plt.axes([0.1,0.5,0.85,0.2])
+    SC = ax5.pcolormesh(Tv, Fv, np.abs(Sv), cmap=plt.cm.jet, rasterized=True)
+    ax5.set_xlim(0,windL)
+    ax5.set_ylim(0.05,10)
+    ax5.set_yscale('log')
+    ax5.set_ylabel('Frequency [Hz]', fontsize=12)
+
+    ax6 = plt.axes([0.9,0.5,0.1,0.2])
+    #ax4.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+    plt.xticks(())
+    plt.yticks(())
+    ax6.spines['right'].set_color('none')
+    ax6.spines['left'].set_color('none')
+    ax6.spines['top'].set_color('none')
+    ax6.spines['bottom'].set_color('none')   
+    ax6.patch.set_alpha(0.)
+    cbar=plt.colorbar(SC, pad=0.05, orientation='vertical')
+    cbar.set_label(r'$|S_v(\tau, f)|$ [m/s]', fontsize=12)
+    cbar.ax.tick_params(labelsize=12)
+
+
+    ax2 = plt.axes([0.1,0.25,0.85,0.2])
+    vmin, vmax = -30, 90        
+    bounds = [-30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+    #bounds = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180]
+    norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+    SC = ax2.pcolormesh(Tv, Fv, baz, cmap=hsv2, norm=norm, rasterized=True)
+
+
+    freq = Fv[:,0]
+    freq_low, freq_high = 1.3, 3
+    i_freq_low = np.argmin(np.abs(freq - freq_low))
+    i_freq_high = np.argmin(np.abs(freq - freq_high))
+    print('frequency', Fv)
+    print('df', np.diff(freq))
+    print('time', Tv[0,:])
+    print('dt', np.diff(Tv[0,:]))
+
+    ax2.set_xlim(0,windL)
+    ax2.set_ylim(0.05,10)
+    ax2.set_yscale('log')
+    #ax2.set_xlabel('lapse time [s]', fontsize=12)
+    ax2.set_ylabel('Frequency [Hz]', fontsize=12)
+
+
+    ax4 = plt.axes([0.9,0.25,0.1,0.2])
+    #ax4.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+    plt.xticks(())
+    plt.yticks(())
+    ax4.spines['right'].set_color('none')
+    ax4.spines['left'].set_color('none')
+    ax4.spines['top'].set_color('none')
+    ax4.spines['bottom'].set_color('none')   
+    ax4.patch.set_alpha(0.)
+    cbar=plt.colorbar(SC, pad=0.05, orientation='vertical')
+    cbar.set_label(r'Back Azimuth [$^{\circ}$]', fontsize=12)
+    cbar.ax.tick_params(labelsize=12)
+
+
+
+    ax3 = plt.axes([0.1,0.0,0.85,0.2])
+    import matplotlib as mpl
+    cmap = plt.cm.binary
+    # extract all colors from the .jet map
+    cmaplist = [cmap(i) for i in range(cmap.N)]
+    # force the first color entry to be grey
+    cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        'Custom cmap', cmaplist, cmap.N)
+    # define the bins and normalize
+    bounds = np.arange(0.8, 1.02, 0.02) 
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    SC = ax3.pcolormesh(Tv, Fv, nip, cmap=cmap, norm=norm, rasterized=True)
+
+
+    ax3.set_xlim(0,windL)
+    ax3.set_ylim(0.05,10)
+    ax3.set_yscale('log')
+    ax3.set_xlabel('lapse time [s]', fontsize=12)
+    ax3.set_ylabel('Frequency [Hz]', fontsize=12)
+
+    ax4 = plt.axes([0.9,0.0,0.1,0.2])
+    #ax4.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+    plt.xticks(())
+    plt.yticks(())
+    ax4.spines['right'].set_color('none')
+    ax4.spines['left'].set_color('none')
+    ax4.spines['top'].set_color('none')
+    ax4.spines['bottom'].set_color('none')   
+    ax4.patch.set_alpha(0.)
+    cbar=plt.colorbar(SC, pad=0.05, orientation='vertical', ticks=[0.4,0.5,0.6,0.7,0.8,0.9,1], extend='min')
+    cbar.set_label('NIP', fontsize=12)
+    cbar.ax.tick_params(labelsize=12)
+
+    plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
+
+    # if starttime==datetime.datetime(2017,10,15,1,10,0):
+    #     plt.savefig('Fig3a.pdf', dpi=100)
+    # elif starttime==datetime.datetime(2017,1,1,1,10,0):
+    #     plt.savefig('Fig3c.pdf', dpi=300)
+        
+    plt.show()
+    
+    np.savez('vals_'+starttime.strftime("%Y%m%d-%H%M%S")+'.npz', t=Tv, f=Fv, baz=baz, nip=nip)
+    
+    """
+    bootstrap
+    """
+    mean_direction_ci = ci_eachf(Fv, baz, Tv)
+    np.save('bazci_'+starttime.strftime("%Y%m%d-%H%M%S")+".npy", mean_direction_ci)  
+    
+    mean_direction_ci = np.load('bazci_'+starttime.strftime("%Y%m%d-%H%M%S")+".npy")
+    
+    
+        
+    
+
+    time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=120) )[0]
+    mean_baz2 = np.zeros(Fv.shape[0])*np.nan
+    Results = np.zeros((Fv.shape[0],2))
+    for i in range(Fv.shape[0]):
+        baz2 = (baz[:,time_baz_idx][i,:]).flatten()
+        baz2 = baz2[baz2==baz2]
+        circmean_val = circular.mean(baz2, deg=True)
+        if circmean_val>180.0:
+            circmean_val -= 360.0
+        mean_baz2[i] = circmean_val
+        Results[i] = np.array([Fv[i,0], circmean_val])
+
+    fv = Results[:,0]
+    x = Results[:,1]
+
+    fig = plt.figure(figsize=(5,8)) 
+    ax3 = plt.axes([0.1,0.68,0.4,0.25])
+    plt.plot(x, fv, lw=1.5, color='C0', zorder=2)
+    
+    for i in range(len(mean_direction_ci[:,0])):
+        plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
+    
+    plt.axvline(x=30.0, color='red', ls='--', zorder=3) ### V.KIRA -> Shinmoe 
+    plt.axvline(x=50.0, color='red', ls='--', zorder=3) ### V.KIRA -> Shinmoe 
+    plt.yscale('log')
+    plt.xlim(-180,180)
+    plt.xticks([-180,-90,0,90,180])
+    plt.ylim(0.05,10)
+    ax3.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=12)
+    ax3.set_ylabel('Frequency [Hz]', fontsize=12)
+    ax3.annotate('Shinmoe-dake', xy=(40,10), xycoords='data', fontsize=10, va='bottom', ha='center', xytext=(0, 3), textcoords='offset points', color='red')
+
+
+    ax4 = plt.axes([0.65,0.73,0.2,0.2])
+    ax4.plot(x, fv, lw=1.5, color='C0')
+    for i in range(len(mean_direction_ci[:,0])):
+        plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
+    ax4.set_yscale('log')
+    ax4.set_xlim(30,50)
+    ax4.set_ylim(1,3)
+    #ax4.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=10)
+
+
+    plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
+
+    if starttime==datetime.datetime(2017,10,15,1,10,0):
+        plt.savefig('Fig3b_r1.pdf', dpi=300)
+    elif starttime==datetime.datetime(2017,1,1,1,10,0):
+        plt.savefig('Fig3d_r1.pdf', dpi=300)
+        
+    plt.show()
+
+    """
+    Mean NIP values for each frequency
+    """
+    
+    time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=120) )[0]
+    
+
+    fv = Results[:,0]
+    mnip = np.nanmedian(nip, axis=1)
+    nipstd = np.nanmean(nip, axis=1)
+    print(nipstd)
+
+    fig = plt.figure(figsize=(5,8)) 
+    ax3 = plt.axes([0.3,0.68,0.4,0.25])
+    plt.plot(mnip, fv, lw=1.5, color='C0', zorder=2)
+    #for i in range(len(mnip)):
+    #    plt.plot([mnip[i]-nipstd[i], mnip[i]+nipstd[i]], [fv[i], fv[i]], color='pink', zorder=1)
+    
+    plt.yscale('log')
+    plt.xlim(0,1)
+    #plt.xticks([])
+    plt.ylim(0.05,10)
+    ax3.set_xlabel('mean NIP', fontsize=12)
+    ax3.set_ylabel('Frequency [Hz]', fontsize=12)
+    
+    # ax4 = plt.axes([0.65,0.73,0.2,0.2])
+    # ax4.plot(x, fv, lw=1.5, color='C0')
+    # for i in range(len(mean_direction_ci[:,0])):
+    #     plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
+    # ax4.set_yscale('log')
+    # ax4.set_xlim(30,50)
+    # ax4.set_ylim(1,3)
+    # #ax4.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=10)
+
+
+    plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
+
+    plt.savefig('Fig3_nipmean_'+starttime.strftime("%Y%m%d-%H%M%S")+'.pdf', dpi=300)
+        
+    plt.show()
