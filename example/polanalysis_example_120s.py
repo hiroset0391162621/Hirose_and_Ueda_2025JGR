@@ -275,9 +275,9 @@ def plot_bazmean(windL, Tv, Fv, mean_direction_ci):
 
 if __name__ == '__main__':
 
-    Fs = 20.0
-    azimuth = 40.0
-    windL = 120.0
+    Fs = 20.0 ### sampling frequency [Hz]
+    azimuth = 40.0 ### initial value. does not affect the final result.
+    windL = 120.0 ### time window length [sec]
     station = 'V.KIRA'
     starttime = datetime.datetime(2017,1,1,1,10,0)
     #starttime = datetime.datetime(2017,10,15,1,10,0)
@@ -310,11 +310,9 @@ if __name__ == '__main__':
 
 
     
-    
-    
-    
     """
     bootstrap
+    Note: Applying the bootstrap method to all f is very computationally expensive.
     """
     mean_direction_ci = ci_eachf(Fv, baz, Tv)
     
