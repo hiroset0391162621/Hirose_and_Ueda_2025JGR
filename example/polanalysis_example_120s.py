@@ -218,7 +218,7 @@ def plot_baz(windL, tr_Z, Fv, Tv, Sv, baz, nip):
 
     plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
 
-    plt.savefig("../img/baz.png", bbox_inches='tight', pad_inches=0.05, dpi=200)
+    #plt.savefig("../img/baz.png", bbox_inches='tight', pad_inches=0.05, dpi=200)
     plt.show()
     
     
@@ -267,7 +267,7 @@ def plot_bazmean(windL, Tv, Fv, mean_direction_ci):
 
 
     plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
-        
+    #plt.savefig("../img/bazmean.png", bbox_inches='tight', pad_inches=0.05, dpi=200)
     plt.show()
 
     
@@ -314,9 +314,9 @@ if __name__ == '__main__':
     bootstrap
     Note: Applying the bootstrap method to all f is very computationally expensive.
     """
-    #mean_direction_ci = ci_eachf(Fv, baz, Tv)
+    mean_direction_ci = ci_eachf(Fv, baz, Tv)
     
-    #plot_bazmean(windL, Tv, Fv, mean_direction_ci)
+    plot_bazmean(windL, Tv, Fv, mean_direction_ci)
     
         
     

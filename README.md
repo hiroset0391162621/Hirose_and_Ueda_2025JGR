@@ -24,3 +24,4 @@ example/nipfilter/
   - The “311” in “libst.cpython-311m-x86_64-linux-gnu.so” must match the version of python in your environment. For example, if you are using python 3.9, edit the file name as “libst.cpython-39m-x86_64-linux-gnu.so”.
     
 ![baz_img](img/baz.png)
+![bazmean_img](img/bazmean.png)
