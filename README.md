@@ -13,5 +13,6 @@ This repository contains the functions used in Hirose and Ueda (2024) along with
     - st.c: C code for s-transform.
   - utils folder:
     - circular.py: Functions for the circular statistics.
+    - bootstrap.py: Function for the bootstrap method.
   - sac folder: sample data.
 
