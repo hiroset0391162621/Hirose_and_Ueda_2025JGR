@@ -334,8 +334,6 @@ if __name__ == '__main__':
         
     plt.show()
     
-    np.savez('vals_'+starttime.strftime("%Y%m%d-%H%M%S")+'.npz', t=Tv, f=Fv, baz=baz, nip=nip)
-    
     """
     bootstrap
     """
