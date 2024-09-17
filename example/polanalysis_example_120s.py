@@ -265,16 +265,12 @@ if __name__ == '__main__':
         
     plt.show()
     
-    np.savez('vals_'+starttime.strftime("%Y%m%d-%H%M%S")+'.npz', t=Tv, f=Fv, baz=baz, nip=nip)
+    
     
     """
     bootstrap
     """
     mean_direction_ci = ci_eachf(Fv, baz, Tv)
-    np.save('bazci_'+starttime.strftime("%Y%m%d-%H%M%S")+".npy", mean_direction_ci)  
-    
-    mean_direction_ci = np.load('bazci_'+starttime.strftime("%Y%m%d-%H%M%S")+".npy")
-    
     
         
     
