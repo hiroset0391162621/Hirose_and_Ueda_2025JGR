@@ -178,9 +178,9 @@ def ci_eachf(Fv, baz, Tv):
 
 if __name__ == '__main__':
 
-    Fs = 20.0
-    azimuth = 40.0
-    windL = 120.0
+    Fs = 20.0 # sampling frequency (Higher Fs take longer to calculate)
+    azimuth = 40.0 # initial value. The final result does not depend on this value.
+    windL = 120.0 # [sec]
     station = 'V.KIRA'
     starttime = datetime.datetime(2017,1,1,1,10,0)
     #starttime = datetime.datetime(2017,10,15,1,10,0)
@@ -204,6 +204,9 @@ if __name__ == '__main__':
     tr_E = stream_E[0].data
 
 
+    """
+    back azimuth estimation
+    """
     baz, nip, Tv, Fv, Sv, Se, Sn = backazimuth.calc_baz(tr_Z.copy(), tr_E.copy(), tr_N.copy(), Fs, azimuth, 'retrograde')
 
 
@@ -338,14 +341,7 @@ if __name__ == '__main__':
     bootstrap
     """
     mean_direction_ci = ci_eachf(Fv, baz, Tv)
-    np.save('bazci_'+starttime.strftime("%Y%m%d-%H%M%S")+".npy", mean_direction_ci)  
     
-    mean_direction_ci = np.load('bazci_'+starttime.strftime("%Y%m%d-%H%M%S")+".npy")
-    
-    
-        
-    
-
     time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=120) )[0]
     mean_baz2 = np.zeros(Fv.shape[0])*np.nan
     Results = np.zeros((Fv.shape[0],2))
