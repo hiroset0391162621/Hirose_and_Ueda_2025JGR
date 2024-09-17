@@ -104,42 +104,7 @@ def ci_eachf(Fv, baz, Tv):
 
     return mean_direction_ci
 
-
-
-
-if __name__ == '__main__':
-
-    Fs = 20.0
-    azimuth = 40.0
-    windL = 120.0
-    station = 'V.KIRA'
-    starttime = datetime.datetime(2017,1,1,1,10,0)
-    #starttime = datetime.datetime(2017,10,15,1,10,0)
-
-    stream_Z = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.U.sac').resample(Fs, window='hann')
-    stream_N = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.N.sac').resample(Fs, window='hann')
-    stream_E = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.E.sac').resample(Fs, window='hann')
-
-
-    stream_Z[0].data *= 1e-9
-    stream_N[0].data *= 1e-9
-    stream_E[0].data *= 1e-9
-
-
-    stream_Z.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
-    stream_N.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
-    stream_E.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
-
-    tr_Z = stream_Z[0].data
-    tr_N = stream_N[0].data
-    tr_E = stream_E[0].data
-
-
-    baz, nip, Tv, Fv, Sv, Se, Sn = backazimuth.calc_baz(tr_Z.copy(), tr_E.copy(), tr_N.copy(), Fs, azimuth, 'retrograde')
-
-
-
-
+def plot_baz(windL, tr_Z, Fv, Tv, Sv, baz, nip):
     fig = plt.figure(figsize=(5,8)) 
 
 
@@ -184,10 +149,8 @@ if __name__ == '__main__':
     cbar.ax.tick_params(labelsize=12)
 
 
-    ax2 = plt.axes([0.1,0.25,0.85,0.2])
-    vmin, vmax = -30, 90        
+    ax2 = plt.axes([0.1,0.25,0.85,0.2])      
     bounds = [-30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
-    #bounds = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180]
     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
     SC = ax2.pcolormesh(Tv, Fv, baz, cmap=hsv2, norm=norm, rasterized=True)
 
@@ -226,12 +189,9 @@ if __name__ == '__main__':
     ax3 = plt.axes([0.1,0.0,0.85,0.2])
     import matplotlib as mpl
     cmap = plt.cm.binary
-    # extract all colors from the .jet map
     cmaplist = [cmap(i) for i in range(cmap.N)]
-    # force the first color entry to be grey
     cmap = mpl.colors.LinearSegmentedColormap.from_list(
         'Custom cmap', cmaplist, cmap.N)
-    # define the bins and normalize
     bounds = np.arange(0.8, 1.02, 0.02) 
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
     SC = ax3.pcolormesh(Tv, Fv, nip, cmap=cmap, norm=norm, rasterized=True)
@@ -258,12 +218,47 @@ if __name__ == '__main__':
 
     plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
 
-    # if starttime==datetime.datetime(2017,10,15,1,10,0):
-    #     plt.savefig('Fig3a.pdf', dpi=100)
-    # elif starttime==datetime.datetime(2017,1,1,1,10,0):
-    #     plt.savefig('Fig3c.pdf', dpi=300)
-        
+    
     plt.show()
+
+
+if __name__ == '__main__':
+
+    Fs = 20.0
+    azimuth = 40.0
+    windL = 120.0
+    station = 'V.KIRA'
+    starttime = datetime.datetime(2017,1,1,1,10,0)
+    #starttime = datetime.datetime(2017,10,15,1,10,0)
+
+    stream_Z = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.U.sac').resample(Fs, window='hann')
+    stream_N = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.N.sac').resample(Fs, window='hann')
+    stream_E = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.E.sac').resample(Fs, window='hann')
+
+
+    stream_Z[0].data *= 1e-9
+    stream_N[0].data *= 1e-9
+    stream_E[0].data *= 1e-9
+
+
+    stream_Z.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+    stream_N.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+    stream_E.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+
+    tr_Z = stream_Z[0].data
+    tr_N = stream_N[0].data
+    tr_E = stream_E[0].data
+
+
+    """
+    Back azimuth estimation
+    """
+    baz, nip, Tv, Fv, Sv, Se, Sn = backazimuth.calc_baz(tr_Z.copy(), tr_E.copy(), tr_N.copy(), Fs, azimuth, 'retrograde')
+
+    
+
+
+    
     
     
     
