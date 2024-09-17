@@ -174,44 +174,7 @@ def ci_eachf(Fv, baz, Tv):
     return mean_direction_ci
 
 
-
-
-if __name__ == '__main__':
-
-    Fs = 20.0 # sampling frequency (Higher Fs take longer to calculate)
-    azimuth = 40.0 # initial value. The final result does not depend on this value.
-    windL = 120.0 # [sec]
-    station = 'V.KIRA'
-    starttime = datetime.datetime(2017,1,1,1,10,0)
-    #starttime = datetime.datetime(2017,10,15,1,10,0)
-
-    stream_Z = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.U.sac').resample(Fs, window='hann')
-    stream_N = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.N.sac').resample(Fs, window='hann')
-    stream_E = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.E.sac').resample(Fs, window='hann')
-
-
-    stream_Z[0].data *= 1e-9
-    stream_N[0].data *= 1e-9
-    stream_E[0].data *= 1e-9
-
-
-    stream_Z.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
-    stream_N.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
-    stream_E.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
-
-    tr_Z = stream_Z[0].data
-    tr_N = stream_N[0].data
-    tr_E = stream_E[0].data
-
-
-    """
-    back azimuth estimation
-    """
-    baz, nip, Tv, Fv, Sv, Se, Sn = backazimuth.calc_baz(tr_Z.copy(), tr_E.copy(), tr_N.copy(), Fs, azimuth, 'retrograde')
-
-
-
-
+def plot_baz(windL, tr_Z, baz, nip, Tv, Fv, Sv):
     fig = plt.figure(figsize=(5,8)) 
 
 
@@ -298,12 +261,9 @@ if __name__ == '__main__':
     ax3 = plt.axes([0.1,0.0,0.85,0.2])
     import matplotlib as mpl
     cmap = plt.cm.binary
-    # extract all colors from the .jet map
     cmaplist = [cmap(i) for i in range(cmap.N)]
-    # force the first color entry to be grey
     cmap = mpl.colors.LinearSegmentedColormap.from_list(
         'Custom cmap', cmaplist, cmap.N)
-    # define the bins and normalize
     bounds = np.arange(0.8, 1.02, 0.02) 
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
     SC = ax3.pcolormesh(Tv, Fv, nip, cmap=cmap, norm=norm, rasterized=True)
@@ -316,7 +276,6 @@ if __name__ == '__main__':
     ax3.set_ylabel('Frequency [Hz]', fontsize=12)
 
     ax4 = plt.axes([0.9,0.0,0.1,0.2])
-    #ax4.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
     plt.xticks(())
     plt.yticks(())
     ax4.spines['right'].set_color('none')
@@ -330,15 +289,51 @@ if __name__ == '__main__':
 
     plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
 
-    # if starttime==datetime.datetime(2017,10,15,1,10,0):
-    #     plt.savefig('Fig3a.pdf', dpi=100)
-    # elif starttime==datetime.datetime(2017,1,1,1,10,0):
-    #     plt.savefig('Fig3c.pdf', dpi=300)
         
     plt.show()
+
+
+if __name__ == '__main__':
+
+    Fs = 20.0 # sampling frequency (Higher Fs take longer to calculate)
+    azimuth = 40.0 # initial value. The final result does not depend on this value.
+    windL = 120.0 # [sec]
+    station = 'V.KIRA'
+    starttime = datetime.datetime(2017,1,1,1,10,0)
+    #starttime = datetime.datetime(2017,10,15,1,10,0)
+
+    stream_Z = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.U.sac').resample(Fs, window='hann')
+    stream_N = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.N.sac').resample(Fs, window='hann')
+    stream_E = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.E.sac').resample(Fs, window='hann')
+
+
+    stream_Z[0].data *= 1e-9
+    stream_N[0].data *= 1e-9
+    stream_E[0].data *= 1e-9
+
+
+    stream_Z.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+    stream_N.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+    stream_E.trim(UTCDateTime(starttime), UTCDateTime(starttime)+windL)
+
+    tr_Z = stream_Z[0].data
+    tr_N = stream_N[0].data
+    tr_E = stream_E[0].data
+
+
+    """
+    back azimuth estimation
+    """
+    baz, nip, Tv, Fv, Sv, Se, Sn = backazimuth.calc_baz(tr_Z.copy(), tr_E.copy(), tr_N.copy(), Fs, azimuth, 'retrograde')
+
+    plot_baz(windL, tr_Z, baz, nip, Tv, Fv, Sv)
+
+
+    
     
     """
     bootstrap
+    Note: Applying the bootstrap method to all f is very computationally expensive. 
     """
     mean_direction_ci = ci_eachf(Fv, baz, Tv)
     
@@ -394,43 +389,4 @@ if __name__ == '__main__':
         
     plt.show()
 
-    """
-    Mean NIP values for each frequency
-    """
-    
-    time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=120) )[0]
-    
-
-    fv = Results[:,0]
-    mnip = np.nanmedian(nip, axis=1)
-    nipstd = np.nanmean(nip, axis=1)
-    print(nipstd)
-
-    fig = plt.figure(figsize=(5,8)) 
-    ax3 = plt.axes([0.3,0.68,0.4,0.25])
-    plt.plot(mnip, fv, lw=1.5, color='C0', zorder=2)
-    #for i in range(len(mnip)):
-    #    plt.plot([mnip[i]-nipstd[i], mnip[i]+nipstd[i]], [fv[i], fv[i]], color='pink', zorder=1)
-    
-    plt.yscale('log')
-    plt.xlim(0,1)
-    #plt.xticks([])
-    plt.ylim(0.05,10)
-    ax3.set_xlabel('mean NIP', fontsize=12)
-    ax3.set_ylabel('Frequency [Hz]', fontsize=12)
-    
-    # ax4 = plt.axes([0.65,0.73,0.2,0.2])
-    # ax4.plot(x, fv, lw=1.5, color='C0')
-    # for i in range(len(mean_direction_ci[:,0])):
-    #     plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
-    # ax4.set_yscale('log')
-    # ax4.set_xlim(30,50)
-    # ax4.set_ylim(1,3)
-    # #ax4.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=10)
-
-
-    plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
-
-    plt.savefig('Fig3_nipmean_'+starttime.strftime("%Y%m%d-%H%M%S")+'.pdf', dpi=300)
-        
-    plt.show()
+   
