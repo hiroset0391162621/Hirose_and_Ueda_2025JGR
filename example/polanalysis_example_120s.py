@@ -1,29 +1,17 @@
-# import copy
-# import cmath
 import sys
 import datetime
-# import pandas as pd
 import numpy as np
-# import scipy.signal as ssig
-#from scipy import *
-# from obspy import read
 import obspy
 from obspy.core import UTCDateTime
-# from obspy.signal.regression import linear_regression
 import matplotlib.pyplot as plt
 from matplotlib.ticker import *
 import warnings
 warnings.simplefilter('ignore')
-# from obspy.signal.trigger import classic_sta_lta
-# from obspy.signal.tf_misfit import cwt
 sys.path.append(sys.path.append("core/"))
 import backazimuth
 sys.path.append(sys.path.append("utils/"))
 import circular
-sys.path.append(sys.path.append("nipfilter/"))
-# from core import stransform, istransform
-# import filter as filt_par
-sys.path.append(sys.path.append("s-transform/"))
+
 
 try:
     import scienceplots
