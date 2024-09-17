@@ -291,6 +291,57 @@ def plot_baz(windL, tr_Z, baz, nip, Tv, Fv, Sv):
 
         
     plt.show()
+    
+
+def plot_meanbaz(windL, Fv, baz, Tv, mean_direction_ci):
+    time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=windL) )[0]
+    mean_baz2 = np.zeros(Fv.shape[0])*np.nan
+    Results = np.zeros((Fv.shape[0],2))
+    for i in range(Fv.shape[0]):
+        baz2 = (baz[:,time_baz_idx][i,:]).flatten()
+        baz2 = baz2[baz2==baz2]
+        circmean_val = circular.mean(baz2, deg=True)
+        if circmean_val>180.0:
+            circmean_val -= 360.0
+        mean_baz2[i] = circmean_val
+        Results[i] = np.array([Fv[i,0], circmean_val])
+
+    fv = Results[:,0]
+    x = Results[:,1]
+
+    fig = plt.figure(figsize=(5,8)) 
+    ax3 = plt.axes([0.1,0.68,0.4,0.25])
+    plt.plot(x, fv, lw=1.5, color='C0', zorder=2)
+    
+    for i in range(len(mean_direction_ci[:,0])):
+        plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
+    
+    plt.axvline(x=30.0, color='red', ls='--', zorder=3) ### V.KIRA -> Shinmoe-dake
+    plt.axvline(x=50.0, color='red', ls='--', zorder=3) ### V.KIRA -> Shinmoe-dake
+    plt.yscale('log')
+    plt.xlim(-180,180)
+    plt.xticks([-180,-90,0,90,180])
+    plt.ylim(0.05,10)
+    ax3.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=12)
+    ax3.set_ylabel('Frequency [Hz]', fontsize=12)
+    ax3.annotate('Shinmoe-dake', xy=(40,10), xycoords='data', fontsize=10, va='bottom', ha='center', xytext=(0, 3), textcoords='offset points', color='red')
+
+
+    ax4 = plt.axes([0.65,0.73,0.2,0.2])
+    ax4.plot(x, fv, lw=1.5, color='C0')
+    for i in range(len(mean_direction_ci[:,0])):
+        plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
+    ax4.set_yscale('log')
+    ax4.set_xlim(30,50)
+    ax4.set_ylim(1,3)
+    
+
+
+    plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)        
+    plt.show()
+
+   
+
 
 
 if __name__ == '__main__':
@@ -337,56 +388,6 @@ if __name__ == '__main__':
     """
     mean_direction_ci = ci_eachf(Fv, baz, Tv)
     
-    time_baz_idx = np.where( (Tv[0,:]>=0) & (Tv[0,:]<=120) )[0]
-    mean_baz2 = np.zeros(Fv.shape[0])*np.nan
-    Results = np.zeros((Fv.shape[0],2))
-    for i in range(Fv.shape[0]):
-        baz2 = (baz[:,time_baz_idx][i,:]).flatten()
-        baz2 = baz2[baz2==baz2]
-        circmean_val = circular.mean(baz2, deg=True)
-        if circmean_val>180.0:
-            circmean_val -= 360.0
-        mean_baz2[i] = circmean_val
-        Results[i] = np.array([Fv[i,0], circmean_val])
-
-    fv = Results[:,0]
-    x = Results[:,1]
-
-    fig = plt.figure(figsize=(5,8)) 
-    ax3 = plt.axes([0.1,0.68,0.4,0.25])
-    plt.plot(x, fv, lw=1.5, color='C0', zorder=2)
+    plot_meanbaz(windL, Fv, baz, Tv, mean_direction_ci)
     
-    for i in range(len(mean_direction_ci[:,0])):
-        plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
     
-    plt.axvline(x=30.0, color='red', ls='--', zorder=3) ### V.KIRA -> Shinmoe 
-    plt.axvline(x=50.0, color='red', ls='--', zorder=3) ### V.KIRA -> Shinmoe 
-    plt.yscale('log')
-    plt.xlim(-180,180)
-    plt.xticks([-180,-90,0,90,180])
-    plt.ylim(0.05,10)
-    ax3.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=12)
-    ax3.set_ylabel('Frequency [Hz]', fontsize=12)
-    ax3.annotate('Shinmoe-dake', xy=(40,10), xycoords='data', fontsize=10, va='bottom', ha='center', xytext=(0, 3), textcoords='offset points', color='red')
-
-
-    ax4 = plt.axes([0.65,0.73,0.2,0.2])
-    ax4.plot(x, fv, lw=1.5, color='C0')
-    for i in range(len(mean_direction_ci[:,0])):
-        plt.plot([mean_direction_ci[i,1], mean_direction_ci[i,2]], [mean_direction_ci[i,0], mean_direction_ci[i,0]], color='pink', zorder=1)
-    ax4.set_yscale('log')
-    ax4.set_xlim(30,50)
-    ax4.set_ylim(1,3)
-    #ax4.set_xlabel(r'mean Back Azimuth [$^{\circ}$]', fontsize=10)
-
-
-    plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
-
-    if starttime==datetime.datetime(2017,10,15,1,10,0):
-        plt.savefig('Fig3b_r1.pdf', dpi=300)
-    elif starttime==datetime.datetime(2017,1,1,1,10,0):
-        plt.savefig('Fig3d_r1.pdf', dpi=300)
-        
-    plt.show()
-
-   
