@@ -218,7 +218,7 @@ def plot_baz(windL, tr_Z, Fv, Tv, Sv, baz, nip):
 
     plt.suptitle(starttime.strftime("%Y.%m.%d %H:%M:%S")+'-'+(starttime+datetime.timedelta(seconds=windL)).strftime(" %H:%M:%S"), fontsize=14)
 
-    
+    plt.savefig("../img/baz.png", bbox_inches='tight', pad_inches=0, dpi=200)
     plt.show()
     
     
@@ -279,8 +279,8 @@ if __name__ == '__main__':
     azimuth = 40.0 ### initial value. does not affect the final result.
     windL = 120.0 ### time window length [sec]
     station = 'V.KIRA'
-    starttime = datetime.datetime(2017,1,1,1,10,0)
-    #starttime = datetime.datetime(2017,10,15,1,10,0)
+    #starttime = datetime.datetime(2017,1,1,1,10,0)
+    starttime = datetime.datetime(2017,10,15,1,10,0)
 
     stream_Z = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.U.sac').resample(Fs, window='hann')
     stream_N = obspy.read('sac/'+starttime.strftime("%Y%m%d")+'/'+starttime.strftime("%Y%m%d%H")+'00'+station+'.N.sac').resample(Fs, window='hann')
@@ -314,9 +314,9 @@ if __name__ == '__main__':
     bootstrap
     Note: Applying the bootstrap method to all f is very computationally expensive.
     """
-    mean_direction_ci = ci_eachf(Fv, baz, Tv)
+    #mean_direction_ci = ci_eachf(Fv, baz, Tv)
     
-    plot_bazmean(windL, Tv, Fv, mean_direction_ci)
+    #plot_bazmean(windL, Tv, Fv, mean_direction_ci)
     
         
     
